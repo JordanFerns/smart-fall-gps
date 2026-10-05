@@ -1,11 +1,16 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Fall Detection - Phone GPS</title>
+
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -17,6 +22,7 @@
       align-items: center;
       padding: 20px;
     }
+
     .card {
       width: 100%;
       max-width: 430px;
@@ -26,8 +32,17 @@
       box-shadow: 0 5px 20px rgba(0,0,0,.12);
       text-align: center;
     }
-    h1 { margin: 0 0 8px; font-size: 25px; }
-    .subtitle { color: #666; margin-bottom: 25px; }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 25px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 25px;
+    }
+
     .status {
       padding: 13px;
       border-radius: 10px;
@@ -35,6 +50,7 @@
       margin-bottom: 20px;
       font-weight: 600;
     }
+
     .location {
       text-align: left;
       background: #f7f7f7;
@@ -42,14 +58,43 @@
       padding: 16px;
       margin-bottom: 20px;
     }
-    .row { margin: 12px 0; }
-    .label { font-size: 13px; color: #666; }
+
+    .row {
+      margin: 12px 0;
+    }
+
+    .label {
+      font-size: 13px;
+      color: #666;
+    }
+
     .value {
       font-size: 18px;
       font-weight: 600;
       word-break: break-all;
       margin-top: 3px;
     }
+
+    .input-section {
+      text-align: left;
+      margin-bottom: 18px;
+    }
+
+    .input-section label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 7px;
+    }
+
+    .input-section input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
     button {
       width: 100%;
       border: 0;
@@ -60,106 +105,414 @@
       cursor: pointer;
       background: #222;
       color: #fff;
+      margin-top: 8px;
     }
-    button:disabled { opacity: .55; }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
     .note {
       margin-top: 18px;
       font-size: 12px;
       color: #777;
       line-height: 1.5;
     }
+
+    .blynk-status {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 9px;
+      background: #f7f7f7;
+      font-size: 13px;
+      font-weight: 600;
+    }
   </style>
+
 </head>
+
 <body>
+
   <div class="card">
-    <h1>SMART FALL DETECTION</h1>
-    <div class="subtitle">Phone GPS Backup</div>
 
-    <div class="status" id="status">Ready to get phone location</div>
+```
+<h1>SMART FALL DETECTION</h1>
 
-    <div class="location">
-      <div class="row">
-        <div class="label">Latitude</div>
-        <div class="value" id="latitude">--</div>
-      </div>
+<div class="subtitle">
+  Phone GPS Backup
+</div>
 
-      <div class="row">
-        <div class="label">Longitude</div>
-        <div class="value" id="longitude">--</div>
-      </div>
+<div class="status" id="status">
+  Ready to get phone location
+</div>
 
-      <div class="row">
-        <div class="label">Accuracy</div>
-        <div class="value" id="accuracy">--</div>
-      </div>
-    </div>
+<div class="location">
 
-    <button id="gpsButton" onclick="getLocation()">
-      GET PHONE LOCATION
-    </button>
+  <div class="row">
+    <div class="label">Latitude</div>
+    <div class="value" id="latitude">--</div>
+  </div>
 
-    <div class="note">
-      This page must be opened through HTTPS for browser GPS permission to work.
-    </div>
+  <div class="row">
+    <div class="label">Longitude</div>
+    <div class="value" id="longitude">--</div>
+  </div>
+
+  <div class="row">
+    <div class="label">Accuracy</div>
+    <div class="value" id="accuracy">--</div>
+  </div>
+
+</div>
+
+<div class="input-section">
+
+  <label for="blynkToken">
+    Blynk Auth Token
+  </label>
+
+  <input
+    type="password"
+    id="blynkToken"
+    placeholder="Enter your existing Blynk Auth Token"
+    autocomplete="off"
+  >
+
+</div>
+
+<button
+  id="gpsButton"
+  onclick="getLocation()"
+>
+  GET PHONE LOCATION
+</button>
+
+<div
+  class="blynk-status"
+  id="blynkStatus"
+>
+  Blynk location: Not sent
+</div>
+
+<div class="note">
+
+  This page must be opened through HTTPS for
+  browser GPS permission to work.
+
+  <br><br>
+
+  Latitude → Blynk V7<br>
+  Longitude → Blynk V8
+
+</div>
+```
+
   </div>
 
 <script>
+
+/* ==================================================
+   BLYNK SETTINGS
+   ================================================== */
+
+const BLYNK_SERVER =
+  "https://blynk.cloud/external/api/update";
+
+
+/* ==================================================
+   LOAD SAVED TOKEN
+   ================================================== */
+
+window.addEventListener("load", function() {
+
+  const savedToken =
+    localStorage.getItem("smartFallBlynkToken");
+
+  if (savedToken) {
+
+    document.getElementById("blynkToken").value =
+      savedToken;
+
+  }
+
+});
+
+
+/* ==================================================
+   SAVE TOKEN
+   ================================================== */
+
+function saveToken() {
+
+  const token =
+    document.getElementById("blynkToken").value.trim();
+
+  if (token) {
+
+    localStorage.setItem(
+      "smartFallBlynkToken",
+      token
+    );
+
+  }
+
+  return token;
+}
+
+
+/* ==================================================
+   SEND LOCATION TO BLYNK
+   ================================================== */
+
+async function sendLocationToBlynk(latitude, longitude) {
+
+  const blynkStatus =
+    document.getElementById("blynkStatus");
+
+  const token = saveToken();
+
+  if (!token) {
+
+    blynkStatus.textContent =
+      "Blynk location: Auth Token required.";
+
+    return false;
+  }
+
+
+  blynkStatus.textContent =
+    "Blynk location: Sending...";
+
+
+  try {
+
+    /*
+       V7 = Latitude
+       V8 = Longitude
+    */
+
+    const url =
+      BLYNK_SERVER +
+      "?token=" +
+      encodeURIComponent(token) +
+      "&V7=" +
+      encodeURIComponent(latitude) +
+      "&V8=" +
+      encodeURIComponent(longitude);
+
+
+    const response =
+      await fetch(url, {
+        method: "GET"
+      });
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        "Blynk server returned HTTP " +
+        response.status
+      );
+
+    }
+
+
+    blynkStatus.textContent =
+      "Blynk location: SENT ✓";
+
+    return true;
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Blynk location error:",
+      error
+    );
+
+    blynkStatus.textContent =
+      "Blynk location: SEND FAILED";
+
+    return false;
+
+  }
+
+}
+
+
+/* ==================================================
+   GET PHONE GPS LOCATION
+   ================================================== */
+
 function getLocation() {
-  const status = document.getElementById("status");
-  const button = document.getElementById("gpsButton");
+
+  const status =
+    document.getElementById("status");
+
+  const button =
+    document.getElementById("gpsButton");
+
+
+  /* -----------------------------------------------
+     HTTPS CHECK
+     ----------------------------------------------- */
 
   if (!window.isSecureContext) {
-    status.textContent = "ERROR: Open this page using HTTPS.";
+
+    status.textContent =
+      "ERROR: Open this page using HTTPS.";
+
     return;
+
   }
+
+
+  /* -----------------------------------------------
+     GPS SUPPORT CHECK
+     ----------------------------------------------- */
 
   if (!navigator.geolocation) {
-    status.textContent = "GPS is not supported by this browser.";
+
+    status.textContent =
+      "GPS is not supported by this browser.";
+
     return;
+
   }
 
-  status.textContent = "Requesting phone GPS...";
+
+  status.textContent =
+    "Requesting phone GPS...";
+
   button.disabled = true;
 
+
+  /* -----------------------------------------------
+     GET GPS
+     ----------------------------------------------- */
+
   navigator.geolocation.getCurrentPosition(
-    function(position) {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      const accuracy = position.coords.accuracy;
 
-      document.getElementById("latitude").textContent = lat.toFixed(7);
-      document.getElementById("longitude").textContent = lon.toFixed(7);
-      document.getElementById("accuracy").textContent =
-        Math.round(accuracy) + " metres";
+    async function(position) {
 
-      status.textContent = "PHONE GPS LOCATION RECEIVED";
+      const lat =
+        position.coords.latitude;
+
+      const lon =
+        position.coords.longitude;
+
+      const accuracy =
+        position.coords.accuracy;
+
+
+      /* -------------------------------------------
+         DISPLAY LOCATION
+         ------------------------------------------- */
+
+      document.getElementById(
+        "latitude"
+      ).textContent =
+        lat.toFixed(7);
+
+
+      document.getElementById(
+        "longitude"
+      ).textContent =
+        lon.toFixed(7);
+
+
+      document.getElementById(
+        "accuracy"
+      ).textContent =
+        Math.round(accuracy) +
+        " metres";
+
+
+      status.textContent =
+        "PHONE GPS LOCATION RECEIVED";
+
+
+      /* -------------------------------------------
+         KEEP LOCATION AVAILABLE
+         ------------------------------------------- */
+
+      window.phoneLatitude = lat;
+
+      window.phoneLongitude = lon;
+
+
+      /* -------------------------------------------
+         SEND TO BLYNK
+         ------------------------------------------- */
+
+      await sendLocationToBlynk(
+        lat,
+        lon
+      );
+
+
       button.disabled = false;
 
-      // Keep these values available for the next ESP8266 integration step.
-      window.phoneLatitude = lat;
-      window.phoneLongitude = lon;
     },
+
+
+    /* ---------------------------------------------
+       GPS ERROR
+       --------------------------------------------- */
+
     function(error) {
-      let message = "Unable to get location.";
+
+      let message =
+        "Unable to get location.";
+
 
       if (error.code === 1) {
-        message = "Location permission denied.";
-      } else if (error.code === 2) {
-        message = "Phone location is unavailable.";
-      } else if (error.code === 3) {
-        message = "GPS request timed out.";
+
+        message =
+          "Location permission denied.";
+
       }
 
-      status.textContent = message;
+      else if (error.code === 2) {
+
+        message =
+          "Phone location is unavailable.";
+
+      }
+
+      else if (error.code === 3) {
+
+        message =
+          "GPS request timed out.";
+
+      }
+
+
+      status.textContent =
+        message;
+
       button.disabled = false;
+
     },
+
+
+    /* ---------------------------------------------
+       GPS OPTIONS
+       --------------------------------------------- */
+
     {
       enableHighAccuracy: true,
       timeout: 15000,
       maximumAge: 0
     }
+
   );
+
 }
+
 </script>
+
 </body>
 </html>
