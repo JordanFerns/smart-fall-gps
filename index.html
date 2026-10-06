@@ -122,11 +122,12 @@
 
     .blynk-status {
       margin-top: 15px;
-      padding: 10px;
+      padding: 12px;
       border-radius: 9px;
       background: #f7f7f7;
       font-size: 13px;
       font-weight: 600;
+      line-height: 1.5;
     }
   </style>
 
@@ -175,7 +176,7 @@
   <input
     type="password"
     id="blynkToken"
-    placeholder="-H9690XuG_ckFX0kqHZ_QFjhcZM_RnW5"
+    placeholder="Enter your existing Blynk Auth Token"
     autocomplete="off"
   >
 
@@ -262,64 +263,122 @@ function saveToken() {
 
 
 /* ==================================================
-   SEND LOCATION TO BLYNK
+   SEND ONE VALUE TO BLYNK
    ================================================== */
 
-async function sendLocationToBlynk(latitude, longitude) {
-
-  const blynkStatus =
-    document.getElementById("blynkStatus");
+async function sendBlynkValue(pin, value) {
 
   const token = saveToken();
 
   if (!token) {
 
-    blynkStatus.textContent =
-      "Blynk location: Auth Token required.";
+    throw new Error(
+      "Blynk Auth Token is empty."
+    );
 
-    return false;
   }
 
 
+  const url =
+    BLYNK_SERVER +
+    "?token=" +
+    encodeURIComponent(token) +
+    "&" +
+    pin +
+    "=" +
+    encodeURIComponent(value);
+
+
+  console.log(
+    "Sending to Blynk:",
+    pin,
+    value
+  );
+
+
+  const response =
+    await fetch(url, {
+      method: "GET",
+      cache: "no-store"
+    });
+
+
+  const responseText =
+    await response.text();
+
+
+  console.log(
+    "Blynk response:",
+    pin,
+    response.status,
+    responseText
+  );
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      "Blynk rejected " +
+      pin +
+      " with HTTP " +
+      response.status +
+      ": " +
+      responseText
+    );
+
+  }
+
+
+  return true;
+}
+
+
+/* ==================================================
+   SEND LOCATION TO BLYNK
+   ================================================== */
+
+async function sendLocationToBlynk(
+  latitude,
+  longitude
+) {
+
+  const blynkStatus =
+    document.getElementById("blynkStatus");
+
+
   blynkStatus.textContent =
-    "Blynk location: Sending...";
+    "Blynk location: Sending latitude...";
 
 
   try {
 
-    /*
-       V7 = Latitude
-       V8 = Longitude
-    */
+    /* ---------------------------------------------
+       SEND LATITUDE → V7
+       --------------------------------------------- */
 
-    const url =
-      BLYNK_SERVER +
-      "?token=" +
-      encodeURIComponent(token) +
-      "&V7=" +
-      encodeURIComponent(latitude) +
-      "&V8=" +
-      encodeURIComponent(longitude);
-
-
-    const response =
-      await fetch(url, {
-        method: "GET"
-      });
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        "Blynk server returned HTTP " +
-        response.status
-      );
-
-    }
+    await sendBlynkValue(
+      "V7",
+      latitude.toFixed(7)
+    );
 
 
     blynkStatus.textContent =
-      "Blynk location: SENT ✓";
+      "Blynk location: Latitude sent ✓";
+
+
+    /* ---------------------------------------------
+       SEND LONGITUDE → V8
+       --------------------------------------------- */
+
+    await sendBlynkValue(
+      "V8",
+      longitude.toFixed(7)
+    );
+
+
+    blynkStatus.textContent =
+      "Blynk location: Latitude ✓ | Longitude ✓";
+
 
     return true;
 
@@ -332,8 +391,11 @@ async function sendLocationToBlynk(latitude, longitude) {
       error
     );
 
+
     blynkStatus.textContent =
-      "Blynk location: SEND FAILED";
+      "Blynk location: SEND FAILED\n" +
+      error.message;
+
 
     return false;
 
@@ -383,8 +445,36 @@ function getLocation() {
   }
 
 
+  /* -----------------------------------------------
+     CHECK TOKEN
+     ----------------------------------------------- */
+
+  const token =
+    document.getElementById("blynkToken")
+      .value
+      .trim();
+
+
+  if (!token) {
+
+    status.textContent =
+      "Enter your Blynk Auth Token first.";
+
+    return;
+
+  }
+
+
+  /* -----------------------------------------------
+     SAVE TOKEN
+     ----------------------------------------------- */
+
+  saveToken();
+
+
   status.textContent =
     "Requesting phone GPS...";
+
 
   button.disabled = true;
 
@@ -435,7 +525,7 @@ function getLocation() {
 
 
       /* -------------------------------------------
-         KEEP LOCATION AVAILABLE
+         STORE LOCATION
          ------------------------------------------- */
 
       window.phoneLatitude = lat;
@@ -447,10 +537,26 @@ function getLocation() {
          SEND TO BLYNK
          ------------------------------------------- */
 
-      await sendLocationToBlynk(
-        lat,
-        lon
-      );
+      const sent =
+        await sendLocationToBlynk(
+          lat,
+          lon
+        );
+
+
+      if (sent) {
+
+        status.textContent =
+          "PHONE GPS SENT TO BLYNK ✓";
+
+      }
+
+      else {
+
+        status.textContent =
+          "PHONE GPS RECEIVED, BUT BLYNK UPDATE FAILED";
+
+      }
 
 
       button.disabled = false;
@@ -493,6 +599,7 @@ function getLocation() {
       status.textContent =
         message;
 
+
       button.disabled = false;
 
     },
@@ -504,7 +611,7 @@ function getLocation() {
 
     {
       enableHighAccuracy: true,
-      timeout: 15000,
+      timeout: 20000,
       maximumAge: 0
     }
 
